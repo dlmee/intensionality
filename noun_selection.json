@@ -1,0 +1,6 @@
+{
+    "Polysemous Nouns": ["time", "man", "point", "course", "place", "children", "system", "end", "thing", "group", "area", "use", "power", "problem", "party", "state", "person", "body", "position", "kind", "line", "book", "process", "sense", "mind"],
+    "Monosemous Nouns": ["century", "week", "language", "school", "company", "country", "mother", "police", "woman", "father", "war", "minute", "industry", "court", "food", "office", "wife", "data", "voice", "air", "light", "meeting", "tax", "bed", "game"],
+    "Concrete Nouns": ["car", "book", "house", "hand", "water", "head", "eyes", "home", "face", "door", "child", "law", "police", "staff", "father", "team", "court", "land", "food", "office", "city", "town", "table", "bed", "game"],
+    "Abstract Nouns": ["time", "life", "freedom", "justice", "information", "development", "interest", "state", "service", "policy", "question", "idea", "moment", "sense", "research", "support", "action", "education", "change", "experience", "care", "value", "history", "nature", "knowledge"]
+}
