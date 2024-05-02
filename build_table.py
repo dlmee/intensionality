@@ -72,9 +72,9 @@ def extract_adj_values_and_store_by_file(directory, key, polysemy_data):
     return sorted_adj_data
 
 # Usage example
-directory = 'data/experiment/results'
-polysemy_noun_file = 'data/experiment/nn_final_counts.json'
-polysemy_adj_file = 'data/experiment/adj_final_counts.json'
+directory = 'experiment/results'
+polysemy_noun_file = 'experiment/nn_final_counts.json'
+polysemy_adj_file = 'experiment/adj_final_counts.json'
 key = 'distance_between_composition_and_observed_phrase'
 
 # Load polysemy data for nouns and adjectives
@@ -95,14 +95,14 @@ def print_word_data(sorted_data, word_type):
         average_scores = {file_key: np.mean(scores) for file_key, scores in details['scores'].items()}
         # Format the scores as a string for better readability
         scores_str = ', '.join([f"{file_key}: {avg_score:.3f}" for file_key, avg_score in average_scores.items()])
-        table.append(f"{word} ({word_type}): Senses: {details['polysemy']}, Frequency: {details['frequency']}, Average Scores: {scores_str}")
+        table.append(f"{word} ({word_type}): Senses: {details['polysemy']}, Frequency: {details['frequency']},Average Scores: {scores_str}")
     return table
 # Print the sorted and averaged data for nouns and adjectives
 t1 = print_word_data(sorted_noun_data, "Noun")
 t2 = print_word_data(sorted_adj_data, "Adj")
 
-with open('data/experiment/analysis/noun_analysis.json', 'w') as outj:
+with open('experiment/analysis/noun_analysis.json', 'w') as outj:
     json.dump(t1, outj, indent=4, ensure_ascii=False)
-with open('data/experiment/analysis/adj_analysis.json', 'w') as outj:
+with open('experiment/analysis/adj_analysis.json', 'w') as outj:
     json.dump(t2, outj, indent=4, ensure_ascii=False)
 
