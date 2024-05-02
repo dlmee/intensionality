@@ -6,6 +6,7 @@ import numpy as np
 import random
 from sklearn.decomposition import TruncatedSVD
 from scipy.sparse import csr_matrix
+import math
 
 
 class Intension:
@@ -189,52 +190,125 @@ class Intension:
         with open(f"vectors/final_AN_matrices.json", "w") as outj:
             json.dump(an_matrices, outj, indent=4, ensure_ascii=False)
 
-    def build_sparce_vecs(self, tgts, phrasal, index, adjtgts):
-        with open(tgts, "r") as inj:
-            tgts = json.load(inj)
-        with open(phrasal, "r") as inj:
-            phrasal = json.load(inj)
+    def build_sparce_vecs(self, index, vectors = None, matrices = None):
+        def apply_svd_to_matrices(matrices, max_components=5):
+            transformed_matrices = {}
+
+            # Iterate over each key in the matrices
+            for k, adj_matrices in tqdm(matrices.items(), desc= "Running SVD"):
+                if not adj_matrices:
+                    print(f"Skipping SVD for {k} due to no data!")
+                    continue
+                # Create a matrix from the vectors
+                data_matrix = np.array([v for v in adj_matrices.values()]).T
+
+                        # Check if the data matrix is large enough for SVD
+                if data_matrix.shape[1] < 2:  # Check if there are at least two features
+                    print(f"Skipping SVD for {k} due to insufficient data. Shape: {data_matrix.shape}")
+                    continue  # Skip this iteration if not enough data
+
+                        # Adjust n_components based on the number of available features
+                n_components = min(max_components, data_matrix.shape[1] - 1)
+                if n_components < 1:
+                    print(f"Skipping SVD for {k} as n_components must be at least 1. Available features: {data_matrix.shape[1]}")
+                    continue
+
+                sparse_matrix = csr_matrix(data_matrix)  # Convert to CSR format for efficient processing
+
+                # Apply SVD
+                svd = TruncatedSVD(n_components=n_components)
+                transformed_data = svd.fit_transform(sparse_matrix).T  # Fit and transform the data
+
+                # Store the transformed data back as a list
+                transformed_matrices[k] = transformed_data.tolist()
+
+            return transformed_matrices
+        
+        
+        
         with open(index, "r") as inj:
             index = json.load(inj)
-        with open(adjtgts, "r") as inj:
-            adjtgts = json.load(inj)
-        #vectors = {k:[0]*len(index) for k in tgts}
-        v_matrices = {k:{} for k in phrasal if k in adjtgts}
-        n_matrices = {k:{} for k in tgts}
-        tgts = [k for k in tgts]
-        svd = TruncatedSVD(n_components=5)
-        """for k,v in tgts.items():
-            for word, count in v.items():
-                vectors[k][index[word]] = count
-        with open("polysemous_sparse_vecs.json", "w") as outj:
-            json.dump(vectors, outj, indent=4, ensure_ascii=False)"""
-        for k,v in tqdm(phrasal.items(), desc="Building AN Matrices"):
-            if k in adjtgts:
-                v_matrices[k] = {k2:[0]*len(index) for k2, v2 in v.items()}
-            for k2, v2 in v.items():
-                #if len(v2) <= 5: continue
-                # Collect n_matrices at the same time.
-                if k2.lower() in tgts:
-                    n_matrices[k2.lower()][k] = [0]*len(index)
-                for word, count in v2.items():
-                    if k in v_matrices:
-                        v_matrices[k][k2][index[word]] = count
-                    if k2.lower() in tgts:
-                        n_matrices[k2.lower()][k][index[word]] = count
-            if k in v_matrices:
-                v_matrices[k] = svd.fit_transform(csr_matrix(np.array([v for v in v_matrices[k].values()]).T)).T.tolist()        
         
-        with open("AN_sparse_mtrx.json", "w") as outj:
-            json.dump(v_matrices, outj, indent=4, ensure_ascii=False)
-        with open("NA_proto_sparse.json", "w") as outj:
-            json.dump(n_matrices, outj, indent=4, ensure_ascii=False)
-        #n_matrices = {k: svd.fit_transform(csr_matrix(np.array([v2 for v2 in v.values() if len(v2) > 5]))) for k,v in n_matrices.items()}
-        for k,v in n_matrices.items():
-            if len(v) > 5:
-                n_matrices[k] = svd.fit_transform(csr_matrix(np.array([v for v in n_matrices[k].values()]).T)).T.tolist() 
-        # Save the transformed n_matrices to JSON
-        with open("PN_transformed_sparse_mtrx.json", "w") as outj:
-            json.dump(n_matrices, outj, indent=4, ensure_ascii=False)
+        if vectors:
+            with open(vectors, "r") as inj:
+                vectors = json.load(inj)
+            vecs = {k:[0]*len(index) for k in vectors.keys()}
+            for k,v in tqdm(vectors.items(), desc="building simple vectors"):
+                for word, count in v.items():
+                    vecs[k][index[word]] = count
+                norm = math.sqrt(sum(y ** 2 for y in vecs[k]))
+                vecs[k] = [x / norm for x in vecs[k]]
+
+            with open("data/experiment/semantic_space/vectors_bncwac20m.json", "w") as outj:
+                json.dump(vecs, outj, indent=4, ensure_ascii=False)
+        
+        if matrices:
+            with open(matrices, "r") as inj:
+                matrices = json.load(inj)
+            
+            svd = TruncatedSVD(n_components=5)
+            # Initialize empty dictionaries for both adj_matrices and noun_matrices
+            adj_matrices = {}
+            noun_matrices = {}
+
+            # Iterate through each adjective and its associated noun dictionary from 'matrices'
+            for adj, noun_dict in tqdm(matrices.items(), desc="building matrices"):
+                if adj not in adj_matrices:
+                    adj_matrices[adj] = {}
+
+                for noun, adj_dict in noun_dict.items():
+                    # Initialize vectors in adj_matrices if not already done
+                    if noun not in adj_matrices[adj]:
+                        adj_matrices[adj][noun] = [0.1] * len(index)
+
+                    # Check if there is actual data to process
+                    if adj_dict:
+                        # Populate the adj_matrices
+                        for k2, count in adj_dict.items():
+                            adj_matrices[adj][noun][index[k2]] = count
+
+                        # Initialize and populate noun_matrices
+                        if noun not in noun_matrices:
+                            noun_matrices[noun] = {}
+                        if adj not in noun_matrices[noun]:
+                            noun_matrices[noun][adj] = [0.1] * len(index)
+                        
+                        # Since adj_dict might already have counts, use the same to populate noun_matrices
+                        for k2, count in adj_dict.items():
+                            noun_matrices[noun][adj][index[k2]] = count
+            print("and done!")
+            normalize = False
+            if normalize:
+                normalized_matrices = {}
+                for adj, noun_vecs in adj_matrices.items():
+                    # Initialize the dictionary for this adjective if not already present
+                    if adj not in normalized_matrices:
+                        normalized_matrices[adj] = {}
+                    
+                    for noun, vec in noun_vecs.items():
+                        # Calculate the norm of the vector
+                        norm = math.sqrt(sum(y ** 2 for y in vec))
+                        # Normalize the vector if the norm is not zero
+                        if norm != 0:
+                            normalized_matrices[adj][noun] = [x / norm for x in vec]
+                        else:
+                            # Handle the case where the vector norm is zero (to avoid division by zero)
+                            normalized_matrices[adj][noun] = vec  # Optionally, you could handle it differently, like setting to vec or [0]*len(vec)
+
+                # Now `normalized_matrices` contains the normalized vectorscs[k]]
+
+
+                with open("data/experiment/semantic_space/AN_Observed_Vectors.json", "w") as outj:
+                    json.dump(normalized_matrices, outj, indent=4, ensure_ascii=False)
+            
+            adj_matrices = apply_svd_to_matrices(adj_matrices)
+            noun_matrices = apply_svd_to_matrices(noun_matrices)
+
+            # Save the transformed n_matrices to JSON
+            with open("data/experiment/semantic_space/adj_higher_order.json", "w") as outj:
+                json.dump(adj_matrices, outj, indent=4, ensure_ascii=False)
+            with open("data/experiment/semantic_space/noun_higher_order.json", "w") as outj:
+                json.dump(noun_matrices, outj, indent=4, ensure_ascii=False)
     
 
     
@@ -320,7 +394,7 @@ if __name__ == "__main__":
 
     myintensionality = Intension('Texts', initial=False, first = 'first_pass.json', second = None, third='third_pass.json', index="index.json")
     #myintensionality.find_phrasal_vectors(('data/experiment/my_adj_candidates.json', 'data/experiment/my_nn_candidates.json'), ('UKWAC_clean',), 'data/second_pass.json', previous = ('vectors/final_AN_vectors_V1.json', 'vectors/final_AN_matrices_V1.json'))
-    myintensionality.build_sparce_vecs('pnouns_vecs.json', 'AN_phrasal_vecs_naive.json', 'index.json', 'my_adj_candidates.json')
+    myintensionality.build_sparce_vecs('data/bnc/index.json', matrices = 'vectors/final_AN_matrices.json') # vectors = 'vectors/final_AN_vectors.json', 
     """mytarget = random.choice(list(myintensionality.third.keys()))
     print(f"My target is {mytarget}")
     result = myintensionality.find_nearest_neighbors(myintensionality.third, mytarget, 5)
